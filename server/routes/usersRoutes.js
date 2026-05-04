@@ -1,0 +1,55 @@
+import express from 'express';
+import { body, param } from 'express-validator';
+import { deleteUser, getUserById, listUsers, updateUser } from '../controllers/usersController.js';
+import { protect } from '../middleware/authMiddleware.js';
+import { authorize } from '../middleware/roleMiddleware.js';
+import { validate } from '../middleware/validate.js';
+
+const router = express.Router();
+const jobRoles = [
+  'frontend-developer',
+  'backend-developer',
+  'full-stack-developer',
+  'ui-ux-designer',
+  'qa-tester',
+  'task-manager',
+  'project-manager',
+  'devops-engineer',
+  'business-analyst',
+  'product-owner',
+  'other'
+];
+
+router.use(protect, authorize('admin'));
+
+router.get('/', listUsers);
+
+router.get(
+  '/:id',
+  [param('id').isMongoId().withMessage('Invalid user ID')],
+  validate,
+  getUserById
+);
+
+router.patch(
+  '/:id',
+  [
+    param('id').isMongoId().withMessage('Invalid user ID'),
+    body('name').optional().trim().notEmpty().withMessage('Name cannot be empty').isLength({ max: 80 }).withMessage('Name is too long'),
+    body('email').optional().isEmail().withMessage('Please provide a valid email').normalizeEmail(),
+    body('role').optional().isIn(['admin', 'member']).withMessage('Role must be admin or member'),
+    body('jobRole').optional().isIn(jobRoles).withMessage('Invalid team role'),
+    body('avatar').optional({ checkFalsy: true }).isURL().withMessage('Avatar must be a valid URL')
+  ],
+  validate,
+  updateUser
+);
+
+router.delete(
+  '/:id',
+  [param('id').isMongoId().withMessage('Invalid user ID')],
+  validate,
+  deleteUser
+);
+
+export default router;

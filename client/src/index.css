@@ -1,0 +1,58 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: 'Outfit', system-ui, sans-serif;
+  color-scheme: light;
+}
+
+.dark {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: #f8fafc;
+}
+
+.dark body {
+  background: #020617;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+@layer components {
+  .app-surface {
+    @apply border border-slate-200/80 bg-white/80 shadow-soft backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/75;
+  }
+
+  .glass-panel {
+    @apply border border-white/60 bg-white/70 shadow-soft backdrop-blur-2xl dark:border-white/10 dark:bg-slate-900/60;
+  }
+
+  .field {
+    @apply w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-500/15 dark:border-white/10 dark:bg-slate-950/70 dark:text-white dark:focus:border-cyan-300;
+  }
+
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-200;
+  }
+
+  .page-title {
+    @apply text-2xl font-bold text-slate-950 dark:text-white sm:text-3xl;
+  }
+
+  .muted {
+    @apply text-sm text-slate-500 dark:text-slate-400;
+  }
+}
