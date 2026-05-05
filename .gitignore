@@ -8,3 +8,4 @@ yarn-error.log*
 .DS_Store
 mongo-backup/
 *.bson
+server-smoke*.log
