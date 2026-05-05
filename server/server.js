@@ -6,7 +6,7 @@ import morgan from 'morgan';
 import path from 'path';
 import rateLimit from 'express-rate-limit';
 import { fileURLToPath } from 'url';
-import { connectDB } from './config/db.js';
+import { getDbStatus, requireDbConnection, startDbConnection } from './config/db.js';
 import { env } from './config/env.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import authRoutes from './routes/authRoutes.js';
@@ -57,13 +57,22 @@ const authLimiter = rateLimit({
 });
 
 app.get('/api/health', (req, res) => {
-  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+  const database = getDbStatus();
+  res.status(200).json({
+    status: 'ok',
+    database: {
+      state: database.state,
+      host: database.host || undefined,
+      error: database.error || undefined
+    },
+    timestamp: new Date().toISOString()
+  });
 });
 
-app.use('/api/auth', authLimiter, authRoutes);
-app.use('/api/users', usersRoutes);
-app.use('/api/projects', projectRoutes);
-app.use('/api/tasks', taskRoutes);
+app.use('/api/auth', requireDbConnection, authLimiter, authRoutes);
+app.use('/api/users', requireDbConnection, usersRoutes);
+app.use('/api/projects', requireDbConnection, projectRoutes);
+app.use('/api/tasks', requireDbConnection, taskRoutes);
 
 if (env.nodeEnv === 'production') {
   const clientDist = path.join(__dirname, '../client/dist');
@@ -77,14 +86,19 @@ app.use(notFound);
 app.use(errorHandler);
 
 export const startServer = async () => {
-  await connectDB();
-  return app.listen(env.port, () => {
+  const server = app.listen(env.port, () => {
     console.log(`Server running on port ${env.port} in ${env.nodeEnv} mode`);
   });
+
+  startDbConnection();
+  return server;
 };
 
 if (env.nodeEnv !== 'test') {
-  startServer();
+  startServer().catch((error) => {
+    console.error(`Server failed to start: ${error.message}`);
+    process.exit(1);
+  });
 }
 
 export default app;

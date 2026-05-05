@@ -2,11 +2,11 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const required = ['MONGO_URI', 'JWT_SECRET', 'JWT_REFRESH_SECRET'];
+const recommended = ['MONGO_URI', 'JWT_SECRET', 'JWT_REFRESH_SECRET'];
 
-for (const key of required) {
+for (const key of recommended) {
   if (!process.env[key] && process.env.NODE_ENV === 'production') {
-    throw new Error(`Missing required environment variable: ${key}`);
+    console.warn(`Missing production environment variable: ${key}`);
   }
 }
 
