@@ -1,5 +1,5 @@
 import { DragDropContext, Draggable, Droppable } from '@hello-pangea/dnd';
-import { Plus, Search, UserPlus, X } from 'lucide-react';
+import { BarChart3, CheckCircle2, Clock3, Plus, Search, UserPlus, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useParams } from 'react-router-dom';
@@ -80,6 +80,30 @@ const ProjectDetail = () => {
     [visibleTasks]
   );
 
+  const projectStats = useMemo(() => {
+    const total = tasks.length;
+    const completed = tasks.filter((task) => task.status === 'done').length;
+    const inProgress = tasks.filter((task) => task.status === 'in-progress').length;
+    const todo = tasks.filter((task) => task.status === 'todo').length;
+
+    return {
+      total,
+      completed,
+      inProgress,
+      todo,
+      progress: total ? Math.round((completed / total) * 100) : 0
+    };
+  }, [tasks]);
+
+  const completionLog = useMemo(
+    () =>
+      tasks
+        .filter((task) => task.status === 'done')
+        .sort((a, b) => new Date(b.completedAt || b.updatedAt) - new Date(a.completedAt || a.updatedAt))
+        .slice(0, 5),
+    [tasks]
+  );
+
   const upsertTask = (task) => {
     setTasks((current) => [task, ...current.filter((item) => item._id !== task._id)]);
   };
@@ -105,7 +129,10 @@ const ProjectDetail = () => {
     setTasks((current) => current.map((item) => (item._id === taskId ? { ...item, status: nextStatus } : item)));
 
     try {
-      const data = await taskApi.update(taskId, { status: nextStatus });
+      const data = await taskApi.update(taskId, {
+        status: nextStatus,
+        completionNote: nextStatus === 'done' ? task.completionNote || 'Marked complete from the Kanban board.' : ''
+      });
       upsertTask(data.task);
       toast.success('Task moved');
     } catch (error) {
@@ -214,6 +241,39 @@ const ProjectDetail = () => {
         </Select>
       </section>
 
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="app-surface rounded-xl p-4">
+          <div className="flex items-center gap-3">
+            <BarChart3 className="h-5 w-5 text-cyan-600 dark:text-cyan-300" />
+            <div>
+              <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">Project progress</p>
+              <p className="text-2xl font-black text-slate-950 dark:text-white">{projectStats.progress}%</p>
+            </div>
+          </div>
+          <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-white/10">
+            <div className="h-full rounded-full bg-cyan-500" style={{ width: `${projectStats.progress}%` }} />
+          </div>
+        </div>
+        <div className="app-surface rounded-xl p-4">
+          <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">Completed</p>
+          <p className="mt-2 flex items-center gap-2 text-2xl font-black text-slate-950 dark:text-white">
+            <CheckCircle2 className="h-5 w-5 text-teal-500" />
+            {projectStats.completed}/{projectStats.total}
+          </p>
+        </div>
+        <div className="app-surface rounded-xl p-4">
+          <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">In progress</p>
+          <p className="mt-2 flex items-center gap-2 text-2xl font-black text-slate-950 dark:text-white">
+            <Clock3 className="h-5 w-5 text-amber-500" />
+            {projectStats.inProgress}
+          </p>
+        </div>
+        <div className="app-surface rounded-xl p-4">
+          <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">Not started</p>
+          <p className="mt-2 text-2xl font-black text-slate-950 dark:text-white">{projectStats.todo}</p>
+        </div>
+      </section>
+
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <DragDropContext onDragEnd={onDragEnd}>
           <div className="grid gap-5 lg:grid-cols-3">
@@ -315,6 +375,27 @@ const ProjectDetail = () => {
               </Button>
             </form>
           ) : null}
+
+          <div className="mt-6 border-t border-slate-200 pt-5 dark:border-white/10">
+            <h2 className="mb-3 text-lg font-bold text-slate-950 dark:text-white">Completion proof</h2>
+            {completionLog.length ? (
+              <div className="space-y-3">
+                {completionLog.map((task) => (
+                  <div key={task._id} className="rounded-xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-slate-950/70">
+                    <p className="text-sm font-bold text-slate-950 dark:text-white">{task.title}</p>
+                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                      Completed by {task.completedBy?.name || task.assignedTo?.name || 'team member'}
+                    </p>
+                    <p className="mt-2 line-clamp-3 text-xs text-slate-600 dark:text-slate-300">
+                      {task.completionNote || 'No completion note added.'}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <EmptyState title="No completed tasks yet" message="Completed work proof will appear here." />
+            )}
+          </div>
         </aside>
       </div>
 

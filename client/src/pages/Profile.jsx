@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { Button } from '../components/Button.jsx';
 import { Input } from '../components/Input.jsx';
 import { Avatar } from '../components/AvatarStack.jsx';
+import { Badge } from '../components/Badge.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { getJobRoleLabel } from '../utils/teamRoles.js';
 import { getApiError, isEmail, isStrongPassword } from '../utils/validators.js';
@@ -85,10 +86,24 @@ const Profile = () => {
             <Avatar user={{ ...user, ...profile }} />
             <h2 className="mt-4 text-xl font-bold text-slate-950 dark:text-white">{user?.name}</h2>
             <p className="text-sm text-slate-500 dark:text-slate-400">{user?.email}</p>
+            <p className="mt-2 text-sm font-semibold text-slate-500 dark:text-slate-400">
+              Employee ID: <span className="text-slate-800 dark:text-slate-100">{user?.employeeId || 'Not set'}</span>
+            </p>
             <span className="mt-4 inline-flex items-center gap-2 rounded-full bg-cyan-100 px-3 py-1 text-sm font-semibold text-cyan-700 dark:bg-cyan-400/10 dark:text-cyan-300">
               <ShieldCheck className="h-4 w-4" />
               {user?.role === 'admin' ? 'Admin - Full Access' : 'Member - Project Access'}
             </span>
+            <Badge
+              className={
+                user?.approvalStatus === 'approved' || user?.role === 'admin'
+                  ? 'mt-3 bg-teal-100 text-teal-700 dark:bg-teal-400/10 dark:text-teal-300'
+                  : user?.approvalStatus === 'rejected'
+                    ? 'mt-3 bg-rose-100 text-rose-700 dark:bg-rose-400/10 dark:text-rose-300'
+                    : 'mt-3 bg-amber-100 text-amber-700 dark:bg-amber-400/10 dark:text-amber-300'
+              }
+            >
+              {user?.role === 'admin' ? 'Company approved' : `${user?.approvalStatus || 'approved'} employee`}
+            </Badge>
             <span className="mt-3 rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-600 dark:bg-white/10 dark:text-slate-300">
               {getJobRoleLabel(user?.jobRole)}
             </span>

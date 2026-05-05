@@ -39,6 +39,14 @@ export const AuthProvider = ({ children }) => {
 
   const signup = async (payload) => {
     const data = await authApi.signup(payload);
+
+    if (data.requiresApproval) {
+      tokenStore.clear();
+      setUser(null);
+      toast.success('Account submitted for admin approval');
+      return data;
+    }
+
     tokenStore.set(data);
     setUser(data.user);
     toast.success('Account created');

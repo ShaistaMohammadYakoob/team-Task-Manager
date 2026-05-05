@@ -3,14 +3,22 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { Button } from '../components/Button.jsx';
-import { Input } from '../components/Input.jsx';
+import { Input, Select } from '../components/Input.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
-import { getApiError, isEmail, isStrongPassword } from '../utils/validators.js';
+import { jobRoleOptions } from '../utils/teamRoles.js';
+import { getApiError, isEmail, isEmployeeId, isStrongPassword } from '../utils/validators.js';
 
 const Signup = () => {
   const { signup, isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ name: '', email: '', password: '', confirmPassword: '' });
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    employeeId: '',
+    jobRole: 'frontend-developer',
+    password: '',
+    confirmPassword: ''
+  });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
@@ -22,6 +30,7 @@ const Signup = () => {
     const next = {};
     if (!form.name.trim()) next.name = 'Name is required';
     if (!isEmail(form.email)) next.email = 'Enter a valid email';
+    if (!isEmployeeId(form.employeeId)) next.employeeId = 'Use 2-40 letters, numbers, hyphen, or underscore';
     if (!isStrongPassword(form.password)) next.password = 'Password must be 8 characters and include a number';
     if (form.password !== form.confirmPassword) next.confirmPassword = 'Passwords do not match';
     setErrors(next);
@@ -33,12 +42,14 @@ const Signup = () => {
     if (!validate()) return;
     setLoading(true);
     try {
-      await signup({
+      const data = await signup({
         name: form.name.trim(),
         email: form.email,
+        employeeId: form.employeeId.trim(),
+        jobRole: form.jobRole,
         password: form.password
       });
-      navigate('/dashboard', { replace: true });
+      navigate(data.requiresApproval ? '/login' : '/dashboard', { replace: true });
     } catch (error) {
       toast.error(getApiError(error));
     } finally {
@@ -70,6 +81,20 @@ const Signup = () => {
             <Input label="Name" value={form.name} onChange={(event) => update('name', event.target.value)} error={errors.name} />
             <Input label="Email" type="email" value={form.email} onChange={(event) => update('email', event.target.value)} error={errors.email} />
             <Input
+              label="Employee ID"
+              value={form.employeeId}
+              onChange={(event) => update('employeeId', event.target.value)}
+              error={errors.employeeId}
+              placeholder="EMP-1024"
+            />
+            <Select label="Team role" value={form.jobRole} onChange={(event) => update('jobRole', event.target.value)}>
+              {jobRoleOptions.map((role) => (
+                <option key={role.value} value={role.value}>
+                  {role.label}
+                </option>
+              ))}
+            </Select>
+            <Input
               label="Password"
               type="password"
               value={form.password}
@@ -87,6 +112,9 @@ const Signup = () => {
               {loading ? 'Creating...' : 'Create account'}
             </Button>
           </form>
+          <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 dark:border-amber-300/20 dark:bg-amber-300/10 dark:text-amber-200">
+            New employee accounts stay pending until an admin confirms they belong to your team/company.
+          </p>
           <p className="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
             Already have an account?{' '}
             <Link to="/login" className="font-semibold text-cyan-700 hover:text-cyan-600 dark:text-cyan-300">

@@ -31,12 +31,21 @@ const passwordRule = body('password')
   .withMessage('Password must be at least 8 characters')
   .matches(/\d/)
   .withMessage('Password must include a number');
+const employeeIdRule = body('employeeId')
+  .trim()
+  .notEmpty()
+  .withMessage('Employee ID is required')
+  .isLength({ min: 2, max: 40 })
+  .withMessage('Employee ID must be 2 to 40 characters')
+  .matches(/^[A-Za-z0-9_-]+$/)
+  .withMessage('Employee ID can only include letters, numbers, hyphen, and underscore');
 
 router.post(
   '/signup',
   [
     body('name').trim().notEmpty().withMessage('Name is required').isLength({ max: 80 }).withMessage('Name is too long'),
     body('email').isEmail().withMessage('Please provide a valid email').normalizeEmail(),
+    employeeIdRule,
     passwordRule,
     body('jobRole').optional().isIn(jobRoles).withMessage('Invalid team role'),
     body('avatar').optional({ checkFalsy: true }).isURL().withMessage('Avatar must be a valid URL')

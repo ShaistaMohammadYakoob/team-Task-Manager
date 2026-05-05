@@ -17,8 +17,6 @@ import usersRoutes from './routes/usersRoutes.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-connectDB();
-
 const app = express();
 const allowedOrigins = [
   env.clientUrl,
@@ -78,6 +76,15 @@ if (env.nodeEnv === 'production') {
 app.use(notFound);
 app.use(errorHandler);
 
-app.listen(env.port, () => {
-  console.log(`Server running on port ${env.port} in ${env.nodeEnv} mode`);
-});
+export const startServer = async () => {
+  await connectDB();
+  return app.listen(env.port, () => {
+    console.log(`Server running on port ${env.port} in ${env.nodeEnv} mode`);
+  });
+};
+
+if (env.nodeEnv !== 'test') {
+  startServer();
+}
+
+export default app;

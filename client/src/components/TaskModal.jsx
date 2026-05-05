@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { taskApi } from '../api/tasks.js';
-import { normalizeTags, todayInput, toDateInput } from '../utils/format.js';
+import { formatDate, normalizeTags, todayInput, toDateInput } from '../utils/format.js';
 import { getJobRoleLabel } from '../utils/teamRoles.js';
 import { getApiError, validateDueDate } from '../utils/validators.js';
 import { Button } from './Button.jsx';
@@ -17,7 +17,8 @@ const defaultForm = {
   status: 'todo',
   priority: 'medium',
   dueDate: '',
-  tags: ''
+  tags: '',
+  completionNote: ''
 };
 
 const emptyProjects = [];
@@ -54,7 +55,8 @@ export const TaskModal = ({
         status: task.status || defaultStatus,
         priority: task.priority || 'medium',
         dueDate: toDateInput(task.dueDate),
-        tags: (task.tags || []).join(', ')
+        tags: (task.tags || []).join(', '),
+        completionNote: task.completionNote || ''
       });
     } else {
       setForm({
@@ -91,7 +93,8 @@ export const TaskModal = ({
         status: form.status,
         priority: form.priority,
         dueDate: form.dueDate || null,
-        tags: normalizeTags(form.tags)
+        tags: normalizeTags(form.tags),
+        completionNote: form.status === 'done' ? form.completionNote.trim() : ''
       };
       const data = task ? await taskApi.update(task._id, payload) : await taskApi.create(payload);
       toast.success(task ? 'Task updated' : 'Task created');
@@ -164,6 +167,20 @@ export const TaskModal = ({
             </Select>
           </div>
           <Input label="Tags" value={form.tags} onChange={(event) => update('tags', event.target.value)} placeholder="design, launch, qa" />
+          {form.status === 'done' ? (
+            <Textarea
+              label="Completion note / how it was done"
+              value={form.completionNote}
+              onChange={(event) => update('completionNote', event.target.value)}
+              placeholder="Example: API integration completed, QA checklist passed, screenshots shared in project channel."
+              maxLength={1000}
+            />
+          ) : null}
+          {task?.completedAt ? (
+            <div className="rounded-xl border border-teal-200 bg-teal-50 p-3 text-sm text-teal-800 dark:border-teal-300/20 dark:bg-teal-300/10 dark:text-teal-200">
+              Completed by <span className="font-bold">{task.completedBy?.name || 'Team member'}</span> on {formatDate(task.completedAt)}
+            </div>
+          ) : null}
           <div className="flex flex-col-reverse justify-between gap-3 sm:flex-row sm:items-center">
             {task ? (
               <Button variant="danger" onClick={() => setConfirmOpen(true)} disabled={loading}>

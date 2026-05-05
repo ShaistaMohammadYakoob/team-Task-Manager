@@ -6,6 +6,9 @@ import { asyncHandler } from '../middleware/asyncHandler.js';
 
 const hashToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
 
+const isApprovedForAccess = (user) =>
+  user.role === 'admin' || !user.approvalStatus || user.approvalStatus === 'approved';
+
 const createAccessToken = (user) =>
   jwt.sign({ id: user._id, role: user.role }, env.jwtSecret, {
     expiresIn: env.accessTokenTtl
@@ -38,7 +41,7 @@ const sendAuthResponse = async (res, user, statusCode = 200) => {
  * Register a new user and return access and refresh tokens.
  */
 export const signup = asyncHandler(async (req, res) => {
-  const { name, email, password, avatar, jobRole } = req.body;
+  const { name, email, password, avatar, jobRole, employeeId } = req.body;
   const existingUser = await User.findOne({ email });
 
   if (existingUser) {
@@ -46,15 +49,35 @@ export const signup = asyncHandler(async (req, res) => {
     throw new Error('Email already exists');
   }
 
+  const existingEmployee = await User.findOne({ employeeId: employeeId?.toUpperCase() });
+
+  if (existingEmployee) {
+    res.status(400);
+    throw new Error('Employee ID already exists');
+  }
+
   const userCount = await User.countDocuments();
+  const isFirstUser = userCount === 0;
   const user = await User.create({
     name,
     email,
     password,
+    employeeId,
     avatar: avatar || '',
-    role: userCount === 0 ? 'admin' : 'member',
-    jobRole: jobRole || (userCount === 0 ? 'task-manager' : 'frontend-developer')
+    role: isFirstUser ? 'admin' : 'member',
+    jobRole: jobRole || (isFirstUser ? 'task-manager' : 'frontend-developer'),
+    approvalStatus: isFirstUser ? 'approved' : 'pending',
+    approvedAt: isFirstUser ? new Date() : null
   });
+
+  if (!isFirstUser) {
+    res.status(201).json({
+      user,
+      requiresApproval: true,
+      message: 'Account created. An admin must approve this employee before login.'
+    });
+    return;
+  }
 
   await sendAuthResponse(res, user, 201);
 });
@@ -69,6 +92,15 @@ export const login = asyncHandler(async (req, res) => {
   if (!user || !(await user.matchPassword(password))) {
     res.status(401);
     throw new Error('Invalid email or password');
+  }
+
+  if (!isApprovedForAccess(user)) {
+    res.status(403);
+    throw new Error(
+      user.approvalStatus === 'rejected'
+        ? user.rejectionReason || 'Your account was not approved by the admin'
+        : 'Your account is pending admin approval'
+    );
   }
 
   await sendAuthResponse(res, user);

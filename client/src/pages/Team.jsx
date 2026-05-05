@@ -1,4 +1,4 @@
-import { BriefcaseBusiness, Crown, Search, ShieldCheck, Trash2, UserCheck, UsersRound } from 'lucide-react';
+import { CheckCircle2, Clock3, IdCard, Search, ShieldCheck, Trash2, UserCheck, UsersRound, XCircle } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { usersApi } from '../api/users.js';
@@ -12,7 +12,7 @@ import { CardSkeleton } from '../components/Skeleton.jsx';
 import { StatCard } from '../components/StatCard.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { formatDate } from '../utils/format.js';
-import { accessRoleLabels, getJobRoleLabel, jobRoleOptions } from '../utils/teamRoles.js';
+import { getJobRoleLabel, jobRoleOptions } from '../utils/teamRoles.js';
 import { getApiError } from '../utils/validators.js';
 
 const Team = () => {
@@ -21,7 +21,7 @@ const Team = () => {
   const [loading, setLoading] = useState(true);
   const [deleteUser, setDeleteUser] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [filters, setFilters] = useState({ search: '', accessRole: '', jobRole: '' });
+  const [filters, setFilters] = useState({ search: '', accessRole: '', jobRole: '', approvalStatus: '' });
 
   const loadUsers = async () => {
     setLoading(true);
@@ -40,13 +40,11 @@ const Team = () => {
   }, []);
 
   const stats = useMemo(() => {
-    const roleCount = new Set(users.map((item) => item.jobRole).filter(Boolean)).size;
-
     return {
       total: users.length,
-      admins: users.filter((item) => item.role === 'admin').length,
-      members: users.filter((item) => item.role === 'member').length,
-      roleCount
+      approved: users.filter((item) => item.role === 'admin' || !item.approvalStatus || item.approvalStatus === 'approved').length,
+      pending: users.filter((item) => item.approvalStatus === 'pending').length,
+      rejected: users.filter((item) => item.approvalStatus === 'rejected').length
     };
   }, [users]);
 
@@ -59,11 +57,14 @@ const Team = () => {
         !search ||
         item.name?.toLowerCase().includes(search) ||
         item.email?.toLowerCase().includes(search) ||
+        item.employeeId?.toLowerCase().includes(search) ||
         jobRoleLabel.includes(search);
       const matchesAccess = !filters.accessRole || item.role === filters.accessRole;
       const matchesJobRole = !filters.jobRole || item.jobRole === filters.jobRole;
+      const status = item.role === 'admin' ? 'approved' : item.approvalStatus || 'approved';
+      const matchesApproval = !filters.approvalStatus || status === filters.approvalStatus;
 
-      return matchesSearch && matchesAccess && matchesJobRole;
+      return matchesSearch && matchesAccess && matchesJobRole && matchesApproval;
     });
   }, [users, filters]);
 
@@ -76,6 +77,29 @@ const Team = () => {
       toast.success(field === 'role' ? 'Access role updated' : 'Team role updated');
     } catch (error) {
       setUsers((current) => current.map((item) => (item._id === targetUser._id ? targetUser : item)));
+      toast.error(getApiError(error));
+    }
+  };
+
+  const updateApproval = async (targetUser, approvalStatus) => {
+    const previous = targetUser;
+    const nextUser = {
+      ...targetUser,
+      approvalStatus,
+      rejectionReason: approvalStatus === 'rejected' ? 'Not verified as a company/team member' : ''
+    };
+
+    setUsers((current) => current.map((item) => (item._id === targetUser._id ? nextUser : item)));
+
+    try {
+      const data = await usersApi.updateApproval(targetUser._id, {
+        approvalStatus,
+        rejectionReason: approvalStatus === 'rejected' ? 'Not verified as a company/team member' : ''
+      });
+      setUsers((current) => current.map((item) => (item._id === targetUser._id ? data.user : item)));
+      toast.success(approvalStatus === 'approved' ? 'Employee approved' : approvalStatus === 'rejected' ? 'Employee rejected' : 'Employee moved to pending');
+    } catch (error) {
+      setUsers((current) => current.map((item) => (item._id === targetUser._id ? previous : item)));
       toast.error(getApiError(error));
     }
   };
@@ -120,14 +144,14 @@ const Team = () => {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard title="Total Users" value={stats.total} icon={UsersRound} tone="cyan" />
-          <StatCard title="Admins" value={stats.admins} icon={Crown} tone="amber" />
-          <StatCard title="Members" value={stats.members} icon={UserCheck} tone="teal" />
-          <StatCard title="Team Roles" value={stats.roleCount} icon={BriefcaseBusiness} tone="rose" />
+          <StatCard title="Approved Employees" value={stats.approved} icon={UserCheck} tone="teal" />
+          <StatCard title="Pending Approval" value={stats.pending} icon={Clock3} tone="amber" />
+          <StatCard title="Rejected Requests" value={stats.rejected} icon={XCircle} tone="rose" />
         </div>
       )}
 
       <section className="app-surface rounded-xl p-5">
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px_240px]">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_190px_220px_220px]">
           <label className="relative block">
             <span className="label">Search users</span>
             <Search className="pointer-events-none absolute bottom-2.5 left-3 h-4 w-4 text-slate-400" />
@@ -146,6 +170,16 @@ const Team = () => {
             <option value="">All access</option>
             <option value="admin">Admin</option>
             <option value="member">Member</option>
+          </Select>
+          <Select
+            label="Approval"
+            value={filters.approvalStatus}
+            onChange={(event) => setFilters((current) => ({ ...current, approvalStatus: event.target.value }))}
+          >
+            <option value="">All approvals</option>
+            <option value="approved">Approved</option>
+            <option value="pending">Pending</option>
+            <option value="rejected">Rejected</option>
           </Select>
           <Select
             label="Team role"
@@ -178,13 +212,14 @@ const Team = () => {
           </div>
           {filteredUsers.length ? (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[980px] text-left">
+              <table className="w-full min-w-[1180px] text-left">
                 <thead className="bg-slate-100 text-xs uppercase text-slate-500 dark:bg-white/5 dark:text-slate-400">
                   <tr>
                     <th className="px-5 py-4 font-bold">User</th>
+                    <th className="px-5 py-4 font-bold">Employee ID</th>
+                    <th className="px-5 py-4 font-bold">Company Approval</th>
                     <th className="px-5 py-4 font-bold">Access Role</th>
                     <th className="px-5 py-4 font-bold">Team Role</th>
-                    <th className="px-5 py-4 font-bold">Status</th>
                     <th className="px-5 py-4 font-bold">Joined</th>
                     <th className="px-5 py-4 text-right font-bold">Actions</th>
                   </tr>
@@ -204,6 +239,58 @@ const Team = () => {
                             </div>
                             <p className="truncate text-sm text-slate-500 dark:text-slate-400">{item.email}</p>
                           </div>
+                        </div>
+                      </td>
+                      <td className="px-5 py-4">
+                        <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-sm font-bold text-slate-700 dark:bg-white/10 dark:text-slate-200">
+                          <IdCard className="h-4 w-4 text-cyan-600 dark:text-cyan-300" />
+                          {item.employeeId || 'Not set'}
+                        </div>
+                      </td>
+                      <td className="px-5 py-4">
+                        <div className="space-y-3">
+                          <Badge
+                            className={
+                              item.role === 'admin' || !item.approvalStatus || item.approvalStatus === 'approved'
+                                ? 'bg-teal-100 text-teal-700 dark:bg-teal-400/10 dark:text-teal-300'
+                                : item.approvalStatus === 'rejected'
+                                  ? 'bg-rose-100 text-rose-700 dark:bg-rose-400/10 dark:text-rose-300'
+                                  : 'bg-amber-100 text-amber-700 dark:bg-amber-400/10 dark:text-amber-300'
+                            }
+                          >
+                            {item.role === 'admin' ? 'approved' : item.approvalStatus || 'approved'}
+                          </Badge>
+                          {item.role !== 'admin' ? (
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                size="sm"
+                                variant="subtle"
+                                icon={CheckCircle2}
+                                onClick={() => updateApproval(item, 'approved')}
+                                disabled={item.approvalStatus === 'approved'}
+                              >
+                                Approve
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                icon={Clock3}
+                                onClick={() => updateApproval(item, 'pending')}
+                                disabled={item.approvalStatus === 'pending'}
+                              >
+                                Pending
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="danger"
+                                icon={XCircle}
+                                onClick={() => updateApproval(item, 'rejected')}
+                                disabled={item.approvalStatus === 'rejected'}
+                              >
+                                Reject
+                              </Button>
+                            </div>
+                          ) : null}
                         </div>
                       </td>
                       <td className="px-5 py-4">
@@ -235,20 +322,6 @@ const Team = () => {
                             </option>
                           ))}
                         </Select>
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="space-y-2">
-                          <Badge
-                            className={
-                              item.role === 'admin'
-                                ? 'bg-cyan-100 text-cyan-700 dark:bg-cyan-400/10 dark:text-cyan-300'
-                                : 'bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300'
-                            }
-                          >
-                            {accessRoleLabels[item.role]}
-                          </Badge>
-                          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">{getJobRoleLabel(item.jobRole)}</p>
-                        </div>
                       </td>
                       <td className="px-5 py-4 text-sm text-slate-500 dark:text-slate-400">{formatDate(item.createdAt)}</td>
                       <td className="px-5 py-4 text-right">

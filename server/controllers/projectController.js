@@ -6,8 +6,8 @@ import { asyncHandler } from '../middleware/asyncHandler.js';
 
 const populateProject = (query) =>
   query
-    .populate('owner', 'name email avatar role')
-    .populate('members.user', 'name email avatar role');
+    .populate('owner', 'name email employeeId avatar role jobRole approvalStatus')
+    .populate('members.user', 'name email employeeId avatar role jobRole approvalStatus');
 
 const memberFilterFor = (user) => {
   if (user.role === 'admin') return {};
@@ -151,6 +151,13 @@ export const addMember = asyncHandler(async (req, res) => {
   if (!user) {
     res.status(404);
     throw new Error('User not found');
+  }
+
+  const approvedForTeam = user.role === 'admin' || !user.approvalStatus || user.approvalStatus === 'approved';
+
+  if (!approvedForTeam) {
+    res.status(403);
+    throw new Error('User must be approved by an admin before joining projects');
   }
 
   const existingMember = project.members.find((member) => member.user.toString() === user._id.toString());

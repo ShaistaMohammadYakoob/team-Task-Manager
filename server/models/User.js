@@ -17,6 +17,14 @@ const userSchema = new mongoose.Schema(
       trim: true,
       match: [/^\S+@\S+\.\S+$/, 'Please provide a valid email']
     },
+    employeeId: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      unique: true,
+      sparse: true,
+      maxlength: [40, 'Employee ID cannot exceed 40 characters']
+    },
     password: {
       type: String,
       required: [true, 'Password is required'],
@@ -45,6 +53,26 @@ const userSchema = new mongoose.Schema(
       ],
       default: 'frontend-developer'
     },
+    approvalStatus: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected'],
+      default: 'approved'
+    },
+    approvedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+    approvedAt: {
+      type: Date,
+      default: null
+    },
+    rejectionReason: {
+      type: String,
+      trim: true,
+      maxlength: [300, 'Rejection reason cannot exceed 300 characters'],
+      default: ''
+    },
     avatar: {
       type: String,
       default: ''
@@ -57,6 +85,8 @@ const userSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+userSchema.index({ approvalStatus: 1 });
 
 userSchema.pre('save', async function hashPassword(next) {
   if (!this.isModified('password')) return next();

@@ -45,6 +45,7 @@ router.post(
     body('priority').optional().isIn(priorities).withMessage('Invalid priority'),
     body('tags').optional().isArray().withMessage('Tags must be an array'),
     body('tags.*').optional().trim().isLength({ max: 32 }).withMessage('Tags must be 32 characters or less'),
+    body('completionNote').optional({ checkFalsy: true }).trim().isLength({ max: 1000 }).withMessage('Completion note is too long'),
     futureDateRule
   ],
   validate,
@@ -69,7 +70,8 @@ router.patch(
     body('priority').optional().isIn(priorities).withMessage('Invalid priority'),
     body('dueDate').optional({ nullable: true, checkFalsy: true }).isISO8601().withMessage('Due date must be a valid date'),
     body('tags').optional().isArray().withMessage('Tags must be an array'),
-    body('tags.*').optional().trim().isLength({ max: 32 }).withMessage('Tags must be 32 characters or less')
+    body('tags.*').optional().trim().isLength({ max: 32 }).withMessage('Tags must be 32 characters or less'),
+    body('completionNote').optional({ checkFalsy: true }).trim().isLength({ max: 1000 }).withMessage('Completion note is too long')
   ],
   validate,
   updateTask

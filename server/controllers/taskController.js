@@ -29,8 +29,9 @@ const ensureProjectAccess = async (projectId, user) => {
 const taskPopulate = (query) =>
   query
     .populate('project', 'title color owner members')
-    .populate('assignedTo', 'name email avatar role')
-    .populate('createdBy', 'name email avatar role');
+    .populate('assignedTo', 'name email employeeId avatar role jobRole approvalStatus')
+    .populate('createdBy', 'name email employeeId avatar role jobRole approvalStatus')
+    .populate('completedBy', 'name email employeeId avatar role jobRole approvalStatus');
 
 const canAccessTask = (task, user) => {
   if (user.role === 'admin') return true;
@@ -68,7 +69,8 @@ export const listTasks = asyncHandler(async (req, res) => {
  * Create a task in a project visible to the authenticated user.
  */
 export const createTask = asyncHandler(async (req, res) => {
-  const { title, description, project, assignedTo, status, priority, dueDate, tags } = req.body;
+  const { title, description, project, assignedTo, status, priority, dueDate, tags, completionNote } = req.body;
+  const taskStatus = status || 'todo';
 
   await ensureProjectAccess(project, req.user);
 
@@ -78,10 +80,13 @@ export const createTask = asyncHandler(async (req, res) => {
     project,
     assignedTo: assignedTo || null,
     createdBy: req.user._id,
-    status: status || 'todo',
+    status: taskStatus,
     priority: priority || 'medium',
     dueDate: dueDate || null,
-    tags: tags || []
+    tags: tags || [],
+    completedBy: taskStatus === 'done' ? req.user._id : null,
+    completedAt: taskStatus === 'done' ? new Date() : null,
+    completionNote: taskStatus === 'done' ? completionNote || '' : ''
   });
 
   const populated = await taskPopulate(Task.findById(task._id));
@@ -123,10 +128,24 @@ export const updateTask = asyncHandler(async (req, res) => {
     throw new Error('Forbidden');
   }
 
-  const allowedFields = ['title', 'description', 'assignedTo', 'status', 'priority', 'dueDate', 'tags'];
+  const previousStatus = task.status;
+  const allowedFields = ['title', 'description', 'assignedTo', 'status', 'priority', 'dueDate', 'tags', 'completionNote'];
 
   for (const field of allowedFields) {
-    if (req.body[field] !== undefined) task[field] = req.body[field] || (field === 'assignedTo' ? null : req.body[field]);
+    if (req.body[field] !== undefined) {
+      task[field] = field === 'assignedTo' && !req.body[field] ? null : req.body[field];
+    }
+  }
+
+  if (task.status === 'done') {
+    if (previousStatus !== 'done' || !task.completedAt || !task.completedBy) {
+      task.completedAt = new Date();
+      task.completedBy = req.user._id;
+    }
+  } else {
+    task.completedAt = null;
+    task.completedBy = null;
+    task.completionNote = '';
   }
 
   await task.save();
