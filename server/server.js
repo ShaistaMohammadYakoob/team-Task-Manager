@@ -88,7 +88,8 @@ app.use(errorHandler);
 export const startServer = async () => {
   const host = process.env.HOST || '0.0.0.0';
   const primaryPort = Number(env.port) || 5000;
-  const fallbackPorts = (process.env.FALLBACK_PORTS || '5000,8080')
+  const defaultFallbackPorts = env.nodeEnv === 'production' ? '3000,5000,5173,8080' : '';
+  const fallbackPorts = (process.env.FALLBACK_PORTS || defaultFallbackPorts)
     .split(',')
     .map((port) => Number(port.trim()))
     .filter((port) => Number.isInteger(port) && port > 0 && port !== primaryPort);
