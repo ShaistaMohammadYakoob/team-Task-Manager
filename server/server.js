@@ -86,8 +86,9 @@ app.use(notFound);
 app.use(errorHandler);
 
 export const startServer = async () => {
-  const server = app.listen(env.port, () => {
-    console.log(`Server running on port ${env.port} in ${env.nodeEnv} mode`);
+  const host = process.env.HOST || '0.0.0.0';
+  const server = app.listen(env.port, host, () => {
+    console.log(`Server running on ${host}:${env.port} in ${env.nodeEnv} mode`);
   });
 
   startDbConnection();
