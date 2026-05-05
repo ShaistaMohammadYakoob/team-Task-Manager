@@ -87,9 +87,31 @@ app.use(errorHandler);
 
 export const startServer = async () => {
   const host = process.env.HOST || '0.0.0.0';
-  const server = app.listen(env.port, host, () => {
-    console.log(`Server running on ${host}:${env.port} in ${env.nodeEnv} mode`);
-  });
+  const primaryPort = Number(env.port) || 5000;
+  const fallbackPorts = (process.env.FALLBACK_PORTS || '5000,8080')
+    .split(',')
+    .map((port) => Number(port.trim()))
+    .filter((port) => Number.isInteger(port) && port > 0 && port !== primaryPort);
+
+  const listen = (port, required = false) =>
+    new Promise((resolve, reject) => {
+      const server = app.listen(port, host);
+
+      server.once('listening', () => {
+        console.log(`Server running on ${host}:${port} in ${env.nodeEnv} mode`);
+        resolve(server);
+      });
+
+      server.once('error', (error) => {
+        if (required) return reject(error);
+        console.warn(`Optional fallback port ${port} unavailable: ${error.message}`);
+        return resolve(null);
+      });
+    });
+
+  const server = await listen(primaryPort, true);
+  const fallbackServers = (await Promise.all(fallbackPorts.map((port) => listen(port)))).filter(Boolean);
+  server.fallbackServers = fallbackServers;
 
   startDbConnection();
   return server;
